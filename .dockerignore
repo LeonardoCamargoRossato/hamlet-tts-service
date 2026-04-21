@@ -1,0 +1,16 @@
+__pycache__
+*.py[cod]
+*$py.class
+.Python
+*.so
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.idea
+.vscode
+*.md
+.cursor
+mcps
+terminals

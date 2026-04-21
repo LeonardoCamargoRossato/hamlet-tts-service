@@ -1,0 +1,27 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# No painel: New > Blueprint > conecte o repo; defina API_TOKEN quando pedido.
+
+services:
+  - type: web
+    name: hamlet-tts
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # Obrigatorio: defina no primeiro deploy (ou depois em Environment).
+      # Use o mesmo valor na Edge Function `hamlet-tts`.
+      - key: API_TOKEN
+        sync: false
+      - key: PIPER_BIN
+        value: /opt/piper/piper
+      - key: MODELS_DIR
+        value: /app/models
+      - key: DEFAULT_VOICE
+        value: pt_BR-faber-medium
+      - key: DEFAULT_FORMAT
+        value: mp3
+      - key: REQUEST_TIMEOUT_SECONDS
+        value: "60"

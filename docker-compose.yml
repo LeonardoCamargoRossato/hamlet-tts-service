@@ -1,0 +1,13 @@
+services:
+  hamlet-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DOWNLOAD_DEFAULT_VOICE: "1"
+    container_name: hamlet-tts
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
