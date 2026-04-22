@@ -1,12 +1,14 @@
 FROM python:3.11-slim
 
+# Piper: release 2023.11.14-2 inclui piper_linux_x86_64.tar.gz (tag v1.2.0 usa nome piper_amd64.tar.gz — 404 se misturado).
+
 # Evita prompts do debconf no build (Render/GitHub Actions).
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIPER_VERSION=1.2.0
+    PIPER_RELEASE=2023.11.14-2
 
 # Nao instalar ffmpeg via apt: puxa muitas libs (OpenGL, etc.) e o build no Render Free costuma falhar (OOM / timeout).
 # Binario estatico pequeno so para conversao WAV -> MP3.
@@ -30,11 +32,16 @@ RUN set -eux \
     && rm -rf /tmp/ffstatic /tmp/ffmpeg-static.tar.xz \
     && ffmpeg -version | head -1
 
-# Install Piper binary and runtime libraries.
-RUN mkdir -p /opt/piper && \
-    curl -fsSL "https://github.com/rhasspy/piper/releases/download/v${PIPER_VERSION}/piper_linux_x86_64.tar.gz" \
-    | tar -xz -C /opt/piper --strip-components=1 && \
-    chmod +x /opt/piper/piper
+# Install Piper binary (release com asset piper_linux_x86_64.tar.gz).
+RUN set -eux \
+    && mkdir -p /opt/piper \
+    && curl -fsSL --retry 5 --connect-timeout 30 --max-time 900 \
+        -o /tmp/piper.tgz \
+        "https://github.com/rhasspy/piper/releases/download/${PIPER_RELEASE}/piper_linux_x86_64.tar.gz" \
+    && tar -xzf /tmp/piper.tgz -C /opt/piper --strip-components=1 \
+    && chmod +x /opt/piper/piper \
+    && rm -f /tmp/piper.tgz \
+    && test -x /opt/piper/piper
 
 WORKDIR /app
 
