@@ -16,13 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /tmp/ffstatic \
-    && curl -fsSL --retry 5 --retry-delay 2 \
+# Download em arquivo (evita pipe curl|tar falhar silenciosamente no Render).
+RUN set -eux \
+    && mkdir -p /tmp/ffstatic \
+    && curl -fsSL --retry 8 --retry-delay 3 --connect-timeout 30 --max-time 900 \
+        -A "HamletTTS-DockerBuild/1.0" \
+        -o /tmp/ffmpeg-static.tar.xz \
         "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" \
-    | tar -xJ -C /tmp/ffstatic \
-    && FFMPEG_BIN="$(find /tmp/ffstatic -maxdepth 3 -type f -name ffmpeg -print -quit)" \
+    && tar -xJf /tmp/ffmpeg-static.tar.xz -C /tmp/ffstatic \
+    && FFMPEG_BIN="$(find /tmp/ffstatic -maxdepth 4 -type f -name ffmpeg -print -quit)" \
+    && test -n "${FFMPEG_BIN:-}" \
     && install -m 0755 "$FFMPEG_BIN" /usr/local/bin/ffmpeg \
-    && rm -rf /tmp/ffstatic \
+    && rm -rf /tmp/ffstatic /tmp/ffmpeg-static.tar.xz \
     && ffmpeg -version | head -1
 
 # Install Piper binary and runtime libraries.
