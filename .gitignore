@@ -8,3 +8,6 @@ venv/
 *.egg-info/
 dist/
 build/
+
+# Arquivos locais com senhas / notas (nao versionar)
+Senha Render

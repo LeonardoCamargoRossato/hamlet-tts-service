@@ -101,6 +101,12 @@ Este servico esta preparado para deploy como **Web Service com Docker** no Rende
 
 2. **Memoria**: Piper + modelo ONNX costuma precisar de mais que o tier gratuito permite em alguns casos. Se o deploy falhar por OOM ou build lento, suba para um plano com mais RAM (ex.: Starter).
 
+### Build falhou no plano Free (status 1)
+
+Se o log para durante `apt-get install` com muitas bibliotecas (antes de Piper/HF), costuma ser **falta de RAM no build** ao instalar pacotes pesados. Este `Dockerfile` **nao** usa mais `apt install ffmpeg` (que puxa OpenGL/audio demais); usa **ffmpeg estatico** so para MP3. Atualize o repo e rode **Manual Deploy** de novo.
+
+Sempre role o **Build log** ate o **ultimo erro em vermelho**; a causa real costuma estar no fim, nao no meio do `apt`.
+
 ### Opcao A — Blueprint (`render.yaml`)
 
 1. No Render: **New +** → **Blueprint**.

@@ -1,17 +1,29 @@
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+# Evita prompts do debconf no build (Render/GitHub Actions).
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PIPER_VERSION=1.2.0
 
+# Nao instalar ffmpeg via apt: puxa muitas libs (OpenGL, etc.) e o build no Render Free costuma falhar (OOM / timeout).
+# Binario estatico pequeno so para conversao WAV -> MP3.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    ffmpeg \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /tmp/ffstatic \
+    && curl -fsSL --retry 5 --retry-delay 2 \
+        "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" \
+    | tar -xJ -C /tmp/ffstatic \
+    && FFMPEG_BIN="$(find /tmp/ffstatic -maxdepth 3 -type f -name ffmpeg -print -quit)" \
+    && install -m 0755 "$FFMPEG_BIN" /usr/local/bin/ffmpeg \
+    && rm -rf /tmp/ffstatic \
+    && ffmpeg -version | head -1
 
 # Install Piper binary and runtime libraries.
 RUN mkdir -p /opt/piper && \
