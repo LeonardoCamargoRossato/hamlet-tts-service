@@ -4,8 +4,8 @@ import tempfile
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from fastapi.background import BackgroundTask
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field, field_validator
 
 
