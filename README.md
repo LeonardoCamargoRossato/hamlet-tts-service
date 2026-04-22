@@ -36,7 +36,9 @@ Variaveis uteis no Render:
 
 | Variavel | Efeito |
 |----------|--------|
-| `REQUEST_TIMEOUT_SECONDS` | Padrao **120** (textos longos) |
+| `PIPER_TIMEOUT_SECONDS` | Padrao **600** — sintese em CPU fraca pode demorar em textos longos |
+| `FFMPEG_TIMEOUT_SECONDS` | Padrao **300** — conversao MP3 |
+| `REQUEST_TIMEOUT_SECONDS` | Opcional **legado**: se setado e os dois acima nao, vale para Piper e ffmpeg |
 | `MP3_BITRATE` | Ex.: `80k` (mais leve/rapido) ou `128k` (mais qualidade) |
 
 ### Audio corrompido / “carregou errado” no player

@@ -17,7 +17,14 @@ PIPER_BIN = os.getenv("PIPER_BIN", "/opt/piper/piper")
 MODELS_DIR = Path(os.getenv("MODELS_DIR", "/app/models"))
 DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "pt_BR-faber-medium")
 DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "mp3")
-REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
+# Piper em CPU fraca (ex. Render Free) pode levar varios minutos em textos longos.
+_LEGACY_TTS_TIMEOUT = os.getenv("REQUEST_TIMEOUT_SECONDS")
+PIPER_TIMEOUT_SECONDS = int(
+    os.getenv("PIPER_TIMEOUT_SECONDS") or _LEGACY_TTS_TIMEOUT or "600",
+)
+FFMPEG_TIMEOUT_SECONDS = int(
+    os.getenv("FFMPEG_TIMEOUT_SECONDS") or _LEGACY_TTS_TIMEOUT or "300",
+)
 # CBR em mono costuma ser mais rapido que VBR -q:a para fala; boa para chat (1-4 paragrafos).
 MP3_BITRATE = os.getenv("MP3_BITRATE", "96k")
 
@@ -83,13 +90,16 @@ def _run_piper(text: str, model_path: Path, output_wav: Path, length_scale: floa
             input=text,
             capture_output=True,
             text=True,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=PIPER_TIMEOUT_SECONDS,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="TTS generation timed out",
+            detail=(
+                f"Piper synthesis exceeded {PIPER_TIMEOUT_SECONDS}s "
+                f"(raise PIPER_TIMEOUT_SECONDS on Render or shorten the text)"
+            ),
         ) from exc
     except FileNotFoundError as exc:
         raise HTTPException(
@@ -127,13 +137,16 @@ def _wav_to_mp3(input_wav: Path, output_mp3: Path) -> None:
             cmd,
             capture_output=True,
             text=True,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=FFMPEG_TIMEOUT_SECONDS,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Audio conversion timed out",
+            detail=(
+                f"MP3 conversion exceeded {FFMPEG_TIMEOUT_SECONDS}s "
+                f"(raise FFMPEG_TIMEOUT_SECONDS or use format wav)"
+            ),
         ) from exc
     except FileNotFoundError as exc:
         raise HTTPException(
