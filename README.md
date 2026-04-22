@@ -12,8 +12,40 @@ Microservico HTTP para TTS do projeto Hamlet. O frontend nunca chama este servic
 
 ## Endpoints
 
-- `GET /health`
-- `POST /tts`
+- `GET /` — informacoes do servico (evita `Not Found` ao abrir a URL raiz no navegador)
+- `GET /health` — health check (use para **prewarm** no Render Free)
+- `POST /tts` — gera audio (Bearer obrigatorio)
+
+## Latencia, Render Free e audio “estranho”
+
+### Cold start no plano Free (ate ~1 min antes de responder)
+
+No **Free**, a instancia **hiberna** apos inatividade. O primeiro request depois disso pode levar **dezenas de segundos** so para **acordar** o container — isso **nao** e bug do Piper; e limite do plano. O aviso aparece no proprio painel do Render.
+
+**O que melhora de verdade a experiencia:**
+
+1. **Plano pago (Starter ou superior)** no mesmo Web Service — a instancia deixa de hibernar como no Free e a latencia volta a ser sobretudo **geracao TTS** (segundos, nao minuto).
+2. **Prewarm na Edge Function**: quando o usuario **abre o chat**, faca um `GET /health` no microservico (com timeout curto). Isso “acorda” o servico **antes** do primeiro `/tts`.
+3. **Feedback no UI**: mostrar “Gerando voz…” **no mesmo instante** em que a Edge Function chama o TTS, para o usuario nao achar que travou.
+
+### Geracao (apos o servico ja estar acordado)
+
+Para **1–4 paragrafos**, o tempo dominante e **Piper + MP3**. A API usa **MP3 em mono com bitrate fixo** (`MP3_BITRATE`, padrao `96k`) para **encode mais rapido** que o perfil VBR anterior.
+
+Variaveis uteis no Render:
+
+| Variavel | Efeito |
+|----------|--------|
+| `REQUEST_TIMEOUT_SECONDS` | Padrao **120** (textos longos) |
+| `MP3_BITRATE` | Ex.: `80k` (mais leve/rapido) ou `128k` (mais qualidade) |
+
+### Audio corrompido / “carregou errado” no player
+
+Se o `.mp3` toca errado ou quebra no meio:
+
+1. Na **Edge Function**, a resposta do `/tts` tem que ser tratada como **binario** (`arrayBuffer()` / `Uint8Array`), **nunca** como texto (`text()` / `json()`), senao o arquivo corrompe.
+2. Confira se nao ha **timeout** menor que o tempo de geracao (Lovable/Supabase costuma ter limite por invocacao).
+3. Teste com `"format":"wav"` para isolar se o problema e o passo MP3 ou o Piper.
 
 Payload de exemplo:
 

@@ -17,11 +17,13 @@ PIPER_BIN = os.getenv("PIPER_BIN", "/opt/piper/piper")
 MODELS_DIR = Path(os.getenv("MODELS_DIR", "/app/models"))
 DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "pt_BR-faber-medium")
 DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "mp3")
-REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "60"))
+REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120"))
+# CBR em mono costuma ser mais rapido que VBR -q:a para fala; boa para chat (1-4 paragrafos).
+MP3_BITRATE = os.getenv("MP3_BITRATE", "96k")
 
 
 class TTSRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=5000)
+    text: str = Field(..., min_length=1, max_length=20000)
     voice: str = Field(default=DEFAULT_VOICE, min_length=3, max_length=120)
     length_scale: float = Field(default=1.0, ge=0.2, le=3.0)
     format: str = Field(default=DEFAULT_FORMAT)
@@ -105,13 +107,19 @@ def _run_piper(text: str, model_path: Path, output_wav: Path, length_scale: floa
 def _wav_to_mp3(input_wav: Path, output_mp3: Path) -> None:
     cmd = [
         "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-y",
         "-i",
         str(input_wav),
+        "-vn",
+        "-ac",
+        "1",
         "-codec:a",
         "libmp3lame",
-        "-q:a",
-        "2",
+        "-b:a",
+        MP3_BITRATE,
         str(output_mp3),
     ]
     try:
@@ -138,6 +146,16 @@ def _wav_to_mp3(input_wav: Path, output_mp3: Path) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"MP3 conversion failed: {result.stderr.strip() or 'unknown error'}",
         )
+
+
+@app.get("/")
+def root() -> dict:
+    return {
+        "service": "hamlet-tts",
+        "health": "/health",
+        "tts": "POST /tts (Bearer token)",
+        "docs": "/docs",
+    }
 
 
 @app.get("/health")

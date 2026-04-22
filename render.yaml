@@ -24,4 +24,6 @@ services:
       - key: DEFAULT_FORMAT
         value: mp3
       - key: REQUEST_TIMEOUT_SECONDS
-        value: "60"
+        value: "120"
+      - key: MP3_BITRATE
+        value: 96k
