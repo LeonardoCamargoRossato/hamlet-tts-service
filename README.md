@@ -1,222 +1,109 @@
-# Hamlet TTS Service (FastAPI + Piper)
+<div align="center">
 
-Microservico HTTP para TTS do projeto Hamlet. O frontend nunca chama este servico diretamente: a chamada deve vir da Edge Function `hamlet-tts`.
+# Hamlet TTS Service
 
-## Arquitetura V1
+### FastAPI + Piper Speech Microservice
 
-- Frontend (Lovable) -> Edge Function `hamlet-tts` -> FastAPI TTS Service
-- FastAPI valida payload + token Bearer
-- Piper gera WAV a partir de texto
-- Opcionalmente converte para MP3 com `ffmpeg`
-- Resposta retorna audio binario (`audio/wav` ou `audio/mpeg`)
+**A containerized text-to-speech backend that provides Portuguese voice generation for the Hamlet platform through a protected service layer.**
 
-## Endpoints
+![Tier](https://img.shields.io/badge/Portfolio-Tier%20A-0A66C2?style=for-the-badge) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
 
-- `GET /` — informacoes do servico (evita `Not Found` ao abrir a URL raiz no navegador)
-- `GET /health` — health check (use para **prewarm** no Render Free)
-- `POST /tts` — gera audio (Bearer obrigatorio)
+</div>
 
-## Latencia, Render Free e audio “estranho”
+## Service Overview
 
-### Cold start no plano Free (ate ~1 min antes de responder)
+This repository contains the dedicated TTS backend for Hamlet. The service isolates speech synthesis from the frontend and exposes a small authenticated HTTP API. Requests are expected to arrive through the Hamlet edge/service layer rather than directly from the browser.
 
-No **Free**, a instancia **hiberna** apos inatividade. O primeiro request depois disso pode levar **dezenas de segundos** so para **acordar** o container — isso **nao** e bug do Piper; e limite do plano. O aviso aparece no proprio painel do Render.
+## Architecture
 
-**O que melhora de verdade a experiencia:**
+```text
+Hamlet Frontend
+      ↓
+Edge Function / Secure Service Layer
+      ↓  Bearer token
+FastAPI TTS Service
+      ↓
+Piper Speech Synthesis
+      ↓
+WAV ──→ optional FFmpeg conversion ──→ MP3
+      ↓
+Binary Audio Response
+```
 
-1. **Plano pago (Starter ou superior)** no mesmo Web Service — a instancia deixa de hibernar como no Free e a latencia volta a ser sobretudo **geracao TTS** (segundos, nao minuto).
-2. **Prewarm na Edge Function**: quando o usuario **abre o chat**, faca um `GET /health` no microservico (com timeout curto). Isso “acorda” o servico **antes** do primeiro `/tts`.
-3. **Feedback no UI**: mostrar “Gerando voz…” **no mesmo instante** em que a Edge Function chama o TTS, para o usuario nao achar que travou.
+## Core Capabilities
 
-### Geracao (apos o servico ja estar acordado)
+- Protected `POST /tts` endpoint
+- `GET /health` health check / prewarm endpoint
+- Piper-based PT-BR speech synthesis
+- WAV and MP3 output
+- Configurable voice and synthesis parameters
+- Dockerized runtime
+- Render deployment blueprint
+- Environment-based secrets/configuration
 
-Para **1–4 paragrafos**, o tempo dominante e **Piper + MP3**. A API usa **MP3 em mono com bitrate fixo** (`MP3_BITRATE`, padrao `96k`) para **encode mais rapido** que o perfil VBR anterior.
+## API
 
-Variaveis uteis no Render:
+### `GET /health`
+Health check used for availability monitoring and prewarming.
 
-| Variavel | Efeito |
-|----------|--------|
-| `PIPER_TIMEOUT_SECONDS` | Padrao **600** — sintese em CPU fraca pode demorar em textos longos |
-| `FFMPEG_TIMEOUT_SECONDS` | Padrao **300** — conversao MP3 |
-| `REQUEST_TIMEOUT_SECONDS` | Opcional **legado**: se setado e os dois acima nao, vale para Piper e ffmpeg |
-| `MP3_BITRATE` | Ex.: `80k` (mais leve/rapido) ou `128k` (mais qualidade) |
-
-### Audio corrompido / “carregou errado” no player
-
-Se o `.mp3` toca errado ou quebra no meio:
-
-1. Na **Edge Function**, a resposta do `/tts` tem que ser tratada como **binario** (`arrayBuffer()` / `Uint8Array`), **nunca** como texto (`text()` / `json()`), senao o arquivo corrompe.
-2. Confira se nao ha **timeout** menor que o tempo de geracao (Lovable/Supabase costuma ter limite por invocacao).
-3. Teste com `"format":"wav"` para isolar se o problema e o passo MP3 ou o Piper.
-
-Payload de exemplo:
+### `POST /tts`
 
 ```json
 {
-  "text": "Texto para narrar",
+  "text": "Text to narrate",
   "voice": "pt_BR-faber-medium",
   "length_scale": 1.0,
   "format": "mp3"
 }
 ```
 
-Header obrigatorio:
+Authentication:
 
-```txt
+```text
 Authorization: Bearer <API_TOKEN>
 ```
 
-## Variaveis de ambiente
+## Tech Stack
 
-Copie:
+`Python` · `FastAPI` · `Piper TTS` · `FFmpeg` · `Docker` · `Docker Compose` · `Render`
+
+## Local Development
 
 ```bash
 cp .env.example .env
-```
-
-Edite pelo menos:
-
-- `API_TOKEN`: token compartilhado com a Edge Function
-- `DEFAULT_VOICE`: voz padrao (ex: `pt_BR-faber-medium`)
-
-## Baixar modelo PT-BR
-
-Para **Docker/Render**, nao e obrigatorio commitar o `.onnx`: se o arquivo `models/pt_BR-faber-medium.onnx` nao existir, o **build da imagem** baixa a voz automaticamente (ver `Dockerfile`).
-
-Para desenvolvimento local **sem** depender do download no build, crie a pasta e baixe os dois arquivos da voz:
-
-```bash
-mkdir -p models
-
-curl -L -o models/pt_BR-faber-medium.onnx \
-https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx
-
-curl -L -o models/pt_BR-faber-medium.onnx.json \
-https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json
-```
-
-## Rodar local com Docker Compose
-
-```bash
 docker compose up --build
 ```
 
-Teste:
+Health check:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-```bash
-curl -X POST "http://localhost:8000/tts" \
-  -H "Authorization: Bearer change-this-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text":"Ola, eu sou o Hamlet.",
-    "voice":"pt_BR-faber-medium",
-    "length_scale":1.0,
-    "format":"mp3"
-  }' \
-  --output hamlet.mp3
-```
+## Configuration
 
-## Deploy no Render (recomendado para este repo)
+Important environment variables include `API_TOKEN`, `DEFAULT_VOICE`, `DEFAULT_FORMAT`, `PIPER_TIMEOUT_SECONDS`, `FFMPEG_TIMEOUT_SECONDS`, `MODELS_DIR` and `MP3_BITRATE`.
 
-Este servico esta preparado para deploy como **Web Service com Docker** no Render:
+Secrets should remain in environment configuration and must not be committed to source control.
 
-- `Dockerfile` na raiz (build remoto baixa Piper + modelo PT-BR no build)
-- `render.yaml` (Blueprint) para criar o servico por IaC
-- Porta HTTP via variavel `PORT` (Render injeta automaticamente; o CMD ja usa `${PORT}`)
-- Health check em `GET /health`
+## Deployment
 
-### Pre-requisitos
+The repository is prepared for a Docker-based Render deployment using the root `Dockerfile` and `render.yaml`. The service exposes `/health` for platform health checks and uses the provider-supplied `PORT` environment variable.
 
-1. Conta no [Render](https://render.com) e repositorio Git (GitHub/GitLab/Bitbucket) com este codigo publicado.
+On sleeping/free infrastructure, the first request can experience a cold start. The architecture supports prewarming through `/health`; production workloads should use an always-on deployment tier when latency is important.
 
-2. **Memoria**: Piper + modelo ONNX costuma precisar de mais que o tier gratuito permite em alguns casos. Se o deploy falhar por OOM ou build lento, suba para um plano com mais RAM (ex.: Starter).
+## Integration Notes
 
-### Build falhou no plano Free (status 1)
+The calling edge layer must preserve the TTS response as binary data (`arrayBuffer` / byte stream). Treating MP3/WAV output as text or JSON will corrupt the audio payload.
 
-Se o log para durante `apt-get install` com muitas bibliotecas (antes de Piper/HF), costuma ser **falta de RAM no build** ao instalar pacotes pesados. Este `Dockerfile` **nao** usa mais `apt install ffmpeg` (que puxa OpenGL/audio demais); usa **ffmpeg estatico** so para MP3. Atualize o repo e rode **Manual Deploy** de novo.
+## Engineering Perspective
 
-Sempre role o **Build log** ate o **ultimo erro em vermelho**; a causa real costuma estar no fim, nao no meio do `apt`.
+This service demonstrates backend/API design, containerization, secret-based service authentication, media processing and separation of concerns within a larger full-stack product.
 
-### Opcao A — Blueprint (`render.yaml`)
+## Portfolio Classification
 
-1. No Render: **New +** → **Blueprint**.
-2. Conecte o repositorio que contem este projeto na raiz.
-3. O Render detecta `render.yaml` e lista o servico `hamlet-tts`.
-4. No fluxo de aplicacao do Blueprint, quando pedir **`API_TOKEN`**, defina um segredo forte (o mesmo que voce colocara na Edge Function).
-5. **Apply** e aguarde o build + deploy.
+**Tier A — Featured Portfolio Project.** Selected as the backend/service counterpart to Hamlet, representing API engineering, containerization and production-oriented integration.
 
-Apos o deploy, anote a URL publica (ex.: `https://hamlet-tts.onrender.com`).
+---
 
-### Opcao B — Web Service manual (sem Blueprint)
-
-1. **New +** → **Web Service**.
-2. Conecte o repo; **Runtime**: **Docker**.
-3. **Dockerfile Path**: `Dockerfile` (raiz). **Docker Build Context Directory**: `.` (raiz).
-4. **Health Check Path**: `/health`.
-5. Em **Environment**, adicione pelo menos:
-
-| Variavel           | Valor |
-|--------------------|--------|
-| `API_TOKEN`        | Mesmo token que a Edge Function envia no header `Authorization` |
-| `PIPER_BIN`        | `/opt/piper/piper` (opcional; ja e o padrao no codigo) |
-| `MODELS_DIR`       | `/app/models` |
-| `DEFAULT_VOICE`    | `pt_BR-faber-medium` |
-| `DEFAULT_FORMAT`   | `mp3` |
-
-**Nao** defina `PORT` manualmente — o Render define.
-
-### Build da imagem e modelo de voz
-
-- O **binario Piper** e baixado no `Dockerfile` a partir do release oficial (GitHub).
-- Se `models/pt_BR-faber-medium.onnx` **nao** existir no repo, o build **baixa automaticamente** o par `.onnx` + `.onnx.json` do Hugging Face (ideal para Render sem commit de arquivos grandes).
-
-Para **desativar** o download no build (build offline com modelos locais):
-
-```bash
-docker build --build-arg DOWNLOAD_DEFAULT_VOICE=0 -t hamlet-tts .
-```
-
-### Verificacao pos-deploy
-
-Substitua a URL e o token:
-
-```bash
-curl -sS "https://SEU-SERVICO.onrender.com/health"
-```
-
-```bash
-curl -sS -X POST "https://SEU-SERVICO.onrender.com/tts" \
-  -H "Authorization: Bearer SEU_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Teste Hamlet no Render.","voice":"pt_BR-faber-medium","length_scale":1.0,"format":"mp3"}' \
-  --output teste.mp3
-```
-
-### Edge Function (`hamlet-tts`)
-
-- URL base: `https://SEU-SERVICO.onrender.com`
-- Chamar `POST /tts` com body JSON igual ao exemplo local.
-- Encaminhar `Authorization: Bearer <API_TOKEN>` (ou montar esse header no servidor da Edge Function com o segredo guardado nas env vars do Lovable/Render).
-
-### Outros provedores (referencia)
-
-- **Railway / Fly.io**: o mesmo `Dockerfile` funciona; ajuste apenas env vars e porta conforme o provedor.
-
-## Integracao com Edge Function
-
-- A Edge Function deve:
-  - Injetar `Authorization: Bearer <API_TOKEN>`
-  - Enviar JSON para `/tts`
-  - Repassar o binario de audio para o cliente
-- O frontend continua desacoplado do provedor TTS
-
-## Proximos passos recomendados
-
-- Limite de taxa por token/IP
-- Observabilidade (logs estruturados + metricas)
-- Suporte a multiplas vozes/modelos por ambiente
-- Opcao de streaming de audio
+**Leonardo Camargo Rossato** · Developer & Solution Architect · AI, Data & Deep Tech
