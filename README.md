@@ -104,6 +104,12 @@ This service demonstrates backend/API design, containerization, secret-based ser
 
 **Tier A — Featured Portfolio Project.** Selected as the backend/service counterpart to Hamlet, representing API engineering, containerization and production-oriented integration.
 
+## Portfolio
+
+Explore my broader software, AI, data and quantum technology work:
+
+**Personal Technical Portfolio:** https://leonardocamargorossato.github.io/LCR-SolutionsArchitecture-IA-Quantum/#/
+
 ---
 
 **Leonardo Camargo Rossato** · Developer & Solution Architect · AI, Data & Deep Tech
